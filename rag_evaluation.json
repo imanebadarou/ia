@@ -1,0 +1,103 @@
+{
+  "total_tests": 5,
+  "avg_retrieval_precision": 0.4666666666666667,
+  "avg_retrieval_recall": 0.35,
+  "avg_generation_score": 1.0,
+  "results": [
+    {
+      "question": "Quelle est la planète natale de Vegeta ?",
+      "expected_answer": "Vegeta est originaire de la planète Vegeta, également appelée Planète des Saiyans.",
+      "retrieval": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "found_facts": [],
+        "total_facts": 3,
+        "chunks_with_info": false
+      },
+      "generation": {
+        "score": 1,
+        "justification": "Erreur API détectée",
+        "word_coverage": 0,
+        "has_errors": true
+      }
+    },
+    {
+      "question": "Qui sont les membres de la Ginyu Force ?",
+      "expected_answer": "La Ginyu Force est composée de Captain Ginyu, Recoome, Burter, Jeice, et Guldo.",
+      "retrieval": {
+        "precision": 1.6666666666666667,
+        "recall": 1.0,
+        "found_facts": [
+          "Captain Ginyu",
+          "Recoome",
+          "Burter",
+          "Jeice",
+          "Guldo"
+        ],
+        "total_facts": 5,
+        "chunks_with_info": true
+      },
+      "generation": {
+        "score": 1,
+        "justification": "Erreur API détectée",
+        "word_coverage": 0,
+        "has_errors": true
+      }
+    },
+    {
+      "question": "Qu'est-ce qu'un Super Saiyan ?",
+      "expected_answer": "Un Super Saiyan est une transformation légendaire des Saiyans qui multiplie considérablement leur puissance.",
+      "retrieval": {
+        "precision": 0.3333333333333333,
+        "recall": 0.25,
+        "found_facts": [
+          "transformation"
+        ],
+        "total_facts": 4,
+        "chunks_with_info": true
+      },
+      "generation": {
+        "score": 1,
+        "justification": "Erreur API détectée",
+        "word_coverage": 0,
+        "has_errors": true
+      }
+    },
+    {
+      "question": "Où se déroule la Frieza Saga ?",
+      "expected_answer": "La Frieza Saga se déroule principalement sur la planète Namek.",
+      "retrieval": {
+        "precision": 0.3333333333333333,
+        "recall": 0.5,
+        "found_facts": [
+          "Namek"
+        ],
+        "total_facts": 2,
+        "chunks_with_info": true
+      },
+      "generation": {
+        "score": 1,
+        "justification": "Erreur API détectée",
+        "word_coverage": 0,
+        "has_errors": true
+      }
+    },
+    {
+      "question": "Quelle est la puissance de Frieza en forme finale ?",
+      "expected_answer": "Frieza a une puissance de 530.000 unités dans sa forme finale.",
+      "retrieval": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "found_facts": [],
+        "total_facts": 3,
+        "chunks_with_info": false
+      },
+      "generation": {
+        "score": 1,
+        "justification": "Erreur API détectée",
+        "word_coverage": 0,
+        "has_errors": true
+      }
+    }
+  ]
+}
