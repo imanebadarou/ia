@@ -64,8 +64,9 @@ def load_rag_system(mode):
         )
 
         if not rag.load_index():
-            st.error("Index non trouvé. Exécutez le script de construction (test_simple_rag.py) pour générer l'index.")
-            return None
+            st.info("Index introuvable, construction en cours (cela peut prendre quelques instants)...")
+            rag.build_index()
+            rag.load_index()
         return rag
     except Exception as e:
         st.error(f"Erreur lors du chargement: {e}")
@@ -94,103 +95,30 @@ def main():
         if question.strip():
             with st.spinner("Recherche en cours..."):
                 try:
-                    # Effectuer la recherche
-                    if rag_mode == "Avancé (Reranking)":
-                        result = rag.ask_question_advanced(question, final_k=k_chunks)
-                        search_results = rag.search_with_reranking(question, final_k=k_chunks)
-                    else:
-                        result = rag.ask_question(question, k=k_chunks)
-                        search_results = rag.search(question, k=k_chunks)
+                    search_results = rag.search(question, k=k_chunks)
+                    answer = rag.generate(question, search_results)
 
-                    # Afficher la réponse
                     st.success("Réponse générée !")
 
-                    # Section réponse
                     st.subheader("🤖 Réponse")
-                    answer = result['answer']
-
                     if "Erreur" in answer:
                         st.error(answer)
                     else:
                         st.write(answer)
 
-                    # Section sources
                     st.subheader("📚 Sources utilisées")
-                    st.metric("Nombre de chunks analysés", result['num_results'])
+                    st.metric("Nombre de chunks analysés", len(search_results))
 
-                    # Afficher les chunks avec leurs scores
                     for i, chunk_result in enumerate(search_results, 1):
-                        with st.expander(f"📄 Source {i} (Score: {chunk_result.get('combined_score', chunk_result.get('score', 'N/A')):.3f})"):
-                            # Preview du chunk
-                            chunk_text = chunk_result['chunk']
+                        score = chunk_result.get("combined_score") or chunk_result.get("score")
+                        with st.expander(f"📄 Source {i} (Score: {score:.3f})"):
+                            chunk_text = chunk_result["chunk"]
                             if len(chunk_text) > 500:
                                 st.write(chunk_text[:500] + "...")
                                 if st.button(f"Voir le chunk complet {i}", key=f"full_{i}"):
                                     st.text_area("Chunk complet:", chunk_text, height=200)
                             else:
                                 st.write(chunk_text)
-
-                    # Mode évaluation
-                    if show_evaluation:
-                        st.subheader("🧪 Évaluation")
-
-                        # Charger l'évaluateur
-                        evaluator = RAGEvaluator(rag)
-
-                        # Trouver le test case correspondant (approximatif)
-                        best_match = None
-                        best_score = 0
-
-                        for test_case in evaluator.test_cases:
-                            # Similarité simple basée sur les mots
-                            q_words = set(question.lower().split())
-                            t_words = set(test_case["question"].lower().split())
-                            similarity = len(q_words & t_words) / len(q_words | t_words)
-
-                            if similarity > best_score:
-                                best_score = similarity
-                                best_match = test_case
-
-                        if best_match and best_score > 0.3:
-                            st.info(f"Test case trouvé (similarité: {best_score:.2f})")
-
-                            # Évaluation du retrieval
-                            retrieval_eval = evaluator.evaluate_retrieval(
-                                question,
-                                search_results,
-                                best_match["key_facts"]
-                            )
-
-                            col1, col2 = st.columns(2)
-                            with col1:
-                                st.metric("Précision Retrieval", f"{retrieval_eval['precision']:.2f}")
-                            with col2:
-                                st.metric("Rappel Retrieval", f"{retrieval_eval['recall']:.2f}")
-
-                            # Évaluation de la génération
-                            if "Erreur" not in answer:
-                                generation_eval = evaluator.evaluate_generation(
-                                    question,
-                                    best_match["expected_answer"],
-                                    answer
-                                )
-
-                                st.metric("Score Génération", f"{generation_eval['score']}/5")
-                                st.write(f"**Justification:** {generation_eval['justification']}")
-
-                                # Comparaison des réponses
-                                st.subheader("🔍 Comparaison")
-                                col1, col2 = st.columns(2)
-
-                                with col1:
-                                    st.write("**Réponse attendue:**")
-                                    st.info(best_match["expected_answer"])
-
-                                with col2:
-                                    st.write("**Réponse du RAG:**")
-                                    st.info(answer)
-                        else:
-                            st.warning("Aucun test case similaire trouvé pour l'évaluation")
 
                 except Exception as e:
                     st.error(f"Erreur lors de la recherche: {e}")
@@ -224,7 +152,7 @@ def main():
         """)
 
         if rag_mode == "Avancé (Reranking)":
-            st.info("🎯 Mode avancé activé: Reranking avec Cross-Encoder pour de meilleurs résultats!")
+            st.info("🎯 Mode avancé activé: Reranking avec Cross-Encoder pour de meilleurs résultats !")
 
     # Footer
     st.markdown("---")

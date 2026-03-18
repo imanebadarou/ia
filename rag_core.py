@@ -5,16 +5,19 @@ This module contains the retrieval+generation logic used by the web UI.
 """
 
 import os
+import time
 from pathlib import Path
 from typing import List, Dict, Any
 
 import faiss
 from dotenv import load_dotenv
+import openai
 from openai import OpenAI
 from sentence_transformers import SentenceTransformer, CrossEncoder
 
 load_dotenv()
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL")
 
 # Default paths
 DEFAULT_CORPUS_DIR = "corpus/saga_freezer"
@@ -164,7 +167,11 @@ class DragonBallRAG:
 
     def generate(self, query: str, context_chunks: List[Dict[str, Any]], model: str = "meta-llama/llama-3.2-3b-instruct:free") -> str:
         if not self.client:
-            return "❌ OPENROUTER_API_KEY missing"
+            return "❌ OPENROUTER_API_KEY missing (définissez OPENROUTER_API_KEY dans .env)"
+
+        # Autoriser le modèle à être surchargé via une variable d'environnement.
+        model_to_use = OPENROUTER_MODEL or model
+        max_retries = int(os.getenv("OPENROUTER_RETRIES", "3"))
 
         context = "\n\n".join(
             f"Source {i+1}: {chunk['chunk']}" for i, chunk in enumerate(context_chunks)
@@ -179,14 +186,35 @@ Contexte:
 
 Réponse:"""
 
-        response = self.client.chat.completions.create(
-            model=model,
-            messages=[
-                {"role": "system", "content": "Tu es un expert Dragon Ball. Réponds de manière précise et concise."},
-                {"role": "user", "content": prompt},
-            ],
-            max_tokens=800,
-            temperature=0.3,
-        )
+        backoff = 1.0
+        for attempt in range(1, max_retries + 1):
+            try:
+                response = self.client.chat.completions.create(
+                    model=model_to_use,
+                    messages=[
+                        {"role": "system", "content": "Tu es un expert Dragon Ball. Réponds de manière précise et concise."},
+                        {"role": "user", "content": prompt},
+                    ],
+                    max_tokens=800,
+                    temperature=0.3,
+                )
 
-        return response.choices[0].message.content.strip()
+                return response.choices[0].message.content.strip()
+
+            except openai.RateLimitError:
+                if attempt == max_retries:
+                    return (
+                        "❌ Taux de requêtes dépassé (429). Réessayez dans quelques instants, "
+                        "ou utilisez votre propre clé OpenRouter (OPENROUTER_API_KEY dans .env)"
+                    )
+                time.sleep(backoff)
+                backoff *= 2
+
+            except openai.OpenAIError as e:
+                return (
+                    f"❌ Erreur OpenRouter ({type(e).__name__}): {e}. "
+                    "Vérifiez votre clé et votre modèle (OPENROUTER_API_KEY / OPENROUTER_MODEL)."
+                )
+
+            except Exception as e:
+                return f"❌ Erreur inattendue lors de la génération : {e}"
