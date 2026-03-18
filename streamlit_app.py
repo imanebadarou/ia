@@ -7,10 +7,7 @@ Démonstration interactive du système de questions-réponses
 import streamlit as st
 import os
 from pathlib import Path
-from simple_rag import SimpleDragonBallRAG
-from advanced_rag import AdvancedDragonBallRAG
-from rag_evaluator import RAGEvaluator
-import json
+from rag_core import DragonBallRAG
 
 # Configuration de la page
 st.set_page_config(
@@ -38,8 +35,6 @@ rag_mode = st.sidebar.selectbox(
 st.sidebar.subheader("🔍 Paramètres de recherche")
 k_chunks = st.sidebar.slider("Nombre de chunks à récupérer:", 3, 10, 5)
 
-# Mode évaluation
-show_evaluation = st.sidebar.checkbox("Mode Évaluation", help="Comparez avec des réponses attendues")
 
 # Statistiques du corpus
 st.sidebar.subheader("📊 Statistiques du Corpus")
@@ -59,16 +54,18 @@ except:
 def load_rag_system(mode):
     """Charge le système RAG approprié"""
     try:
-        if mode == "Avancé (Reranking)":
-            rag = AdvancedDragonBallRAG()
-            if not rag.load_index():
-                st.error("Index avancé non trouvé. Lancez advanced_rag.py d'abord.")
-                return None
-        else:
-            rag = SimpleDragonBallRAG()
-            if not rag.load_index():
-                st.error("Index basique non trouvé. Lancez test_simple_rag.py d'abord.")
-                return None
+        use_reranking = mode == "Avancé (Reranking)"
+        vectorstore_path = "advanced_vectorstore" if use_reranking else "vectorstore"
+
+        rag = DragonBallRAG(
+            corpus_dir="corpus/saga_freezer",
+            vectorstore_path=vectorstore_path,
+            use_reranking=use_reranking,
+        )
+
+        if not rag.load_index():
+            st.error("Index non trouvé. Exécutez le script de construction (test_simple_rag.py) pour générer l'index.")
+            return None
         return rag
     except Exception as e:
         st.error(f"Erreur lors du chargement: {e}")
