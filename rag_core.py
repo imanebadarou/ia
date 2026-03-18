@@ -169,9 +169,12 @@ class DragonBallRAG:
         if not self.client:
             return "❌ OPENROUTER_API_KEY missing (définissez OPENROUTER_API_KEY dans .env)"
 
+        if not OPENROUTER_API_KEY:
+            return "❌ Clé API non définie dans .env ou OPENROUTER_API_KEY est vide"
+
         # Autoriser le modèle à être surchargé via une variable d'environnement.
         model_to_use = OPENROUTER_MODEL or model
-        max_retries = int(os.getenv("OPENROUTER_RETRIES", "3"))
+        max_retries = int(os.getenv("OPENROUTER_RETRIES", "5"))
 
         context = "\n\n".join(
             f"Source {i+1}: {chunk['chunk']}" for i, chunk in enumerate(context_chunks)
@@ -186,9 +189,10 @@ Contexte:
 
 Réponse:"""
 
-        backoff = 1.0
+        backoff = 2.0  # Commencer avec 2 secondes
         for attempt in range(1, max_retries + 1):
             try:
+                print(f"[Tentative {attempt}/{max_retries}] Envoi à OpenRouter (modèle: {model_to_use})...")
                 response = self.client.chat.completions.create(
                     model=model_to_use,
                     messages=[
@@ -201,20 +205,33 @@ Réponse:"""
 
                 return response.choices[0].message.content.strip()
 
-            except openai.RateLimitError:
+            except openai.RateLimitError as e:
                 if attempt == max_retries:
                     return (
-                        "❌ Taux de requêtes dépassé (429). Réessayez dans quelques instants, "
-                        "ou utilisez votre propre clé OpenRouter (OPENROUTER_API_KEY dans .env)"
+                        f"❌ Rate limit OpenRouter atteint après {max_retries} tentatives.\n"
+                        f"Erreur: {e}\n"
+                        f"Solutions:\n"
+                        f"1. Augmentez OPENROUTER_RETRIES dans .env\n"
+                        f"2. Utilisez un modèle payant: OPENROUTER_MODEL=gpt-3.5-turbo\n"
+                        f"3. Attendez quelques minutes avant de réessayer"
                     )
-                time.sleep(backoff)
+                wait_time = backoff
+                print(f"⏳ Rate limit - Attente de {wait_time}s avant nouvelle tentative...")
+                time.sleep(wait_time)
                 backoff *= 2
+
+            except openai.AuthenticationError as e:
+                return (
+                    f"❌ Authentification échouée. Votre clé API est invalide ou a expiré.\n"
+                    f"Erreur: {e}\n"
+                    f"Vérifiez OPENROUTER_API_KEY dans .env"
+                )
 
             except openai.OpenAIError as e:
                 return (
-                    f"❌ Erreur OpenRouter ({type(e).__name__}): {e}. "
-                    "Vérifiez votre clé et votre modèle (OPENROUTER_API_KEY / OPENROUTER_MODEL)."
+                    f"❌ Erreur OpenRouter ({type(e).__name__}): {e}\n"
+                    f"Vérifiez votre modèle: OPENROUTER_MODEL={model_to_use}"
                 )
 
             except Exception as e:
-                return f"❌ Erreur inattendue lors de la génération : {e}"
+                return f"❌ Erreur inattendue : {type(e).__name__}: {e}"

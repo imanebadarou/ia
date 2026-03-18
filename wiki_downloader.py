@@ -9,13 +9,22 @@ import json
 import re
 import requests
 import argparse
+import time
 from pathlib import Path
 
 from dotenv import load_dotenv
 import os
 
 load_dotenv()
-api_key = os.getenv("OPENROUTER_API_KEY")
+
+# En-têtes pour les requêtes HTTP (User-Agent pour respecter les limites de Fandom)
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+}
+
+# Délai minimum entre les requêtes (en secondes) pour respecter les limites de Fandom
+REQUEST_DELAY = 0.5
+last_request_time = 0
 
 # Dragon Ball (Fandom)
 BASE_URL = "https://dragonball.fandom.com"
@@ -25,6 +34,15 @@ API_ENDPOINT = f"{BASE_URL}/api.php"
 # BASE_URL = "https://dragonball.fandom.com"        # ← votre wiki
 # API_ENDPOINT = f"{BASE_URL}/api.php"               # ← adapter le chemin si nécessaire
 
+
+
+def _respect_rate_limit():
+    """Attendre le délai minimum entre les requêtes pour respecter les limites de Fandom."""
+    global last_request_time
+    elapsed = time.time() - last_request_time
+    if elapsed < REQUEST_DELAY:
+        time.sleep(REQUEST_DELAY - elapsed)
+    last_request_time = time.time()
 
 
 def _strip_html(html: str) -> str:
@@ -55,13 +73,14 @@ def _strip_html(html: str) -> str:
 
 def _parse_page(title: str) -> dict:
     """Fetch a page via action=parse (works on all MediaWiki sites)."""
+    _respect_rate_limit()
     params = {
         "action": "parse",
         "page": title,
         "prop": "text|wikitext",
         "format": "json",
     }
-    resp = requests.get(API_ENDPOINT, params=params, timeout=30)
+    resp = requests.get(API_ENDPOINT, params=params, headers=HEADERS, timeout=30)
     resp.raise_for_status()
     data = resp.json()
     if "error" in data:
@@ -89,6 +108,7 @@ def get_page(title: str, fmt: str = "text") -> dict:
         return {"title": parsed["title"], "content": parsed["wikitext"], "format": "wikitext"}
 
     # --- Plain text: try extracts first, fall back to parse + strip ---
+    _respect_rate_limit()
     params = {
         "action": "query",
         "titles": title,
@@ -96,7 +116,7 @@ def get_page(title: str, fmt: str = "text") -> dict:
         "explaintext": True,
         "format": "json",
     }
-    resp = requests.get(API_ENDPOINT, params=params, timeout=30)
+    resp = requests.get(API_ENDPOINT, params=params, headers=HEADERS, timeout=30)
     resp.raise_for_status()
     data = resp.json()
     pages = data.get("query", {}).get("pages", {})
@@ -118,6 +138,7 @@ def get_page(title: str, fmt: str = "text") -> dict:
 
 def search_pages(query: str, limit: int = 10) -> list[dict]:
     """Search for pages matching a query string."""
+    _respect_rate_limit()
     params = {
         "action": "query",
         "list": "search",
@@ -125,13 +146,14 @@ def search_pages(query: str, limit: int = 10) -> list[dict]:
         "srlimit": limit,
         "format": "json",
     }
-    resp = requests.get(API_ENDPOINT, params=params, timeout=30)
+    resp = requests.get(API_ENDPOINT, params=params, headers=HEADERS, timeout=30)
     resp.raise_for_status()
     return resp.json()["query"]["search"]
 
 
 def get_category_members(category: str, limit: int = 50) -> list[str]:
     """List page titles in a category (without 'Category:' prefix)."""
+    _respect_rate_limit()
     params = {
         "action": "query",
         "list": "categorymembers",
@@ -139,7 +161,7 @@ def get_category_members(category: str, limit: int = 50) -> list[str]:
         "cmlimit": limit,
         "format": "json",
     }
-    resp = requests.get(API_ENDPOINT, params=params, timeout=30)
+    resp = requests.get(API_ENDPOINT, params=params, headers=HEADERS, timeout=30)
     resp.raise_for_status()
     return [m["title"] for m in resp.json()["query"]["categorymembers"]]
 
